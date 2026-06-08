@@ -61,41 +61,45 @@ type PrintLayoutProps = {
 function PrintLayout({ title, items, className = "" }: PrintLayoutProps) {
   return (
     <div className={className}>
-      <header className="mb-4 rounded-sm bg-zinc-600 px-3 py-2">
-        <h1 className="text-2xl font-bold text-white">{title}</h1>
-      </header>
-
       <div className="space-y-4">
-        {LEVEL_OPTIONS.map((level) => {
+        {LEVEL_OPTIONS.map((level, levelIndex) => {
           const levelItems = items.filter((item) => item.level === level);
           if (levelItems.length === 0) return null;
 
           return (
-            <section key={level}>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-600">
-                {level}
-              </h2>
+            <section key={level} className="print-level-section">
+              <div className="print-page-columns">
+                {levelIndex === 0 ? (
+                  <header className="print-layout-header mb-4 rounded-sm bg-zinc-600 px-3 py-2">
+                    <h1 className="text-left text-2xl font-bold text-white">{title}</h1>
+                  </header>
+                ) : null}
 
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                {levelItems.map((item) => (
-                  <article key={item.id} className="break-inside-avoid page-break-inside-avoid pb-3 border-b border-zinc-300">
-                    <div className="grid grid-cols-2 gap-4 text-base font-semibold text-zinc-900">
-                      <span className="min-w-0 wrap-break-word">{item.word}</span>
-                      <span className="min-w-0 text-right wrap-break-word text-zinc-700">
-                        {item.translation}
-                      </span>
-                    </div>
+                <h2 className="print-level-title mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-600">
+                  {level}
+                </h2>
 
-                    <div className="grid grid-cols-2 gap-4 text-sm text-zinc-700">
-                      <span className="min-w-0 wrap-break-word italic">{item.example}</span>
-                      <span className="min-w-0 text-right wrap-break-word font-medium uppercase tracking-wide text-zinc-500">
-                        {item.type}
-                      </span>
-                    </div>
+                <div className="space-y-3">
+                  {levelItems.map((item) => (
+                    <article key={item.id} className="print-vocab-item pb-3 border-b border-zinc-300">
+                      <div className="grid grid-cols-2 gap-4 text-base font-semibold text-zinc-900">
+                        <span className="min-w-0 wrap-break-word">{item.word}</span>
+                        <span className="min-w-0 text-right wrap-break-word text-zinc-700">
+                          {item.translation}
+                        </span>
+                      </div>
 
-                    <p className="text-sm text-zinc-700 wrap-break-word">{item.exampleZh}</p>
-                  </article>
-                ))}
+                      <div className="grid grid-cols-2 gap-4 text-sm text-zinc-700">
+                        <span className="min-w-0 wrap-break-word italic">{item.example}</span>
+                        <span className="min-w-0 text-right wrap-break-word font-medium uppercase tracking-wide text-zinc-500">
+                          {item.type}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-zinc-700 wrap-break-word">{item.exampleZh}</p>
+                    </article>
+                  ))}
+                </div>
               </div>
             </section>
           );
@@ -995,9 +999,28 @@ export default function LessonPage() {
 
           <div className="print-scope hidden print:block print:bg-white">
             <style jsx global>{`
+              .print-page-columns {
+                column-count: 2;
+                column-gap: 1.5rem;
+                column-fill: auto;
+                column-rule: 1px solid #d4d4d8;
+              }
+
+              .print-layout-header {
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
+
+              .print-vocab-item {
+                break-inside: avoid-column;
+                page-break-inside: avoid;
+                margin-bottom: 0.75rem;
+              }
+
               @media print {
                 @page {
                   size: A4 landscape;
+                  margin: 10mm;
                 }
                 html,
                 body {
@@ -1012,6 +1035,20 @@ export default function LessonPage() {
                   margin: 0 !important;
                   padding: 0 !important;
                   min-height: 0 !important;
+                }
+
+                .print-level-section {
+                  break-before: page;
+                  page-break-before: always;
+                }
+
+                .print-level-section:first-of-type {
+                  break-before: auto;
+                  page-break-before: auto;
+                }
+
+                .print-level-title {
+                  margin-bottom: 0.5rem;
                 }
               }
             `}</style>
