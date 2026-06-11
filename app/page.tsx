@@ -458,7 +458,7 @@ export default function Home() {
       <div className="max-w-6xl mx-auto">
         <header className="mb-10 text-center">
           <p className="inline-flex items-center rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            {totalLessons} lecon{totalLessons > 1 ? "s" : ""}
+            {totalLessons} leçon{totalLessons > 1 ? "s" : ""}
           </p>
           <h1 className="mt-4 text-4xl font-extrabold text-zinc-900 dark:text-zinc-50 mb-2">
             Vocabulaire Français
@@ -544,13 +544,13 @@ export default function Home() {
                       className="w-full aspect-square overflow-hidden flex flex-col items-start justify-between p-4 sm:p-5 bg-white/90 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-blue-300 dark:hover:border-blue-700 transition-all group/card"
                     >
                       <span className="inline-flex rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2.5 py-1 text-xs font-semibold">
-                        Lecon {lesson.number}
+                        leçon {lesson.number}
                       </span>
                       <span className="text-left font-bold text-zinc-800 dark:text-zinc-100 text-sm sm:text-base leading-snug group-hover/card:text-blue-600 dark:group-hover/card:text-blue-300 wrap-break-word line-clamp-4">
                         {lesson.title}
                       </span>
                       <span className="text-xs text-zinc-400 group-hover/card:text-blue-500 dark:group-hover/card:text-blue-400 transition-colors">
-                        Ouvrir la lecon →
+                        Ouvrir la leçon →
                       </span>
                     </button>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -630,7 +630,7 @@ export default function Home() {
                   +
                 </span>
                 <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
-                  Nouvelle lecon
+                  Nouvelle leçon
                 </span>
               </button>
             )}
