@@ -20,6 +20,14 @@ export interface VocabularyItem {
   translation: string;
   example: string;
   exampleZh: string;
+  article?: string;
+  gender?: string;
+  variants?: string;
+  phoneticDifficulty?: string;
+  adjMasculine?: string;
+  adjFeminine?: string;
+  adjInclusive?: string;
+  remarks?: string;
 }
 
 export interface WordSuggestion {
@@ -27,6 +35,11 @@ export interface WordSuggestion {
   translation: string;
   example: string;
   exampleZh: string;
+  article?: string;
+  gender?: string;
+  adjMasculine?: string;
+  adjFeminine?: string;
+  adjInclusive?: string;
 }
 
 /**
@@ -60,13 +73,24 @@ export async function getWordSuggestions(
 2. Chinese translation in traditional Chinese
 3. Example French sentence using this word naturally
 4. Chinese translation (traditional Chinese) of the French example sentence
+5. Article (le, la, un, une, les, des...) if applicable
+6. Gender (masculin, féminin) if applicable
+7. If the word is a noun, also provide its adjective forms:
+   - Masculine form
+   - Feminine form
+   - Inclusive form (e.g. épicé·e, salé·e)
 
 Format your response as JSON only, with no markdown or extra text:
 {
   "type": "type_en_francais",
   "translation": "Traduction chinoise traditionnelle",
   "example": "Example sentence in French",
-  "exampleZh": "Traduction chinoise traditionnelle de la phrase d'exemple"
+  "exampleZh": "Traduction chinoise traditionnelle de la phrase d'exemple",
+  "article": "le/la/un...",
+  "gender": "masculin/féminin",
+  "adjMasculine": "masculine form",
+  "adjFeminine": "feminine form",
+  "adjInclusive": "inclusive form"
 }`;
 
     // Call GitHub Models API via REST endpoint
@@ -102,7 +126,13 @@ Format your response as JSON only, with no markdown or extra text:
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
+    let content = data.choices?.[0]?.message?.content || "";
+    console.log("GitHub Models API response:", content);
+
+    // Clean up content if it's wrapped in markdown code blocks
+    if (content.includes("```")) {
+      content = content.replace(/```json\n?|```/g, "").trim();
+    }
 
     // Parse JSON response
     const parsed = JSON.parse(content);
@@ -112,6 +142,11 @@ Format your response as JSON only, with no markdown or extra text:
       translation: parsed.translation || "",
       example: parsed.example || "",
       exampleZh: parsed.exampleZh || "",
+      article: parsed.article || "",
+      gender: parsed.gender || "",
+      adjMasculine: parsed.adjMasculine || "",
+      adjFeminine: parsed.adjFeminine || "",
+      adjInclusive: parsed.adjInclusive || "",
     };
   } catch (error) {
     console.error("Error fetching word suggestions from GitHub Models:", error);

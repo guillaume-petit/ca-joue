@@ -129,12 +129,25 @@ export default function LessonPage() {
     translation: "",
     example: "",
     exampleZh: "",
+    article: "",
+    gender: "",
+    variants: "",
+    phoneticDifficulty: "",
+    adjMasculine: "",
+    adjFeminine: "",
+    adjInclusive: "",
+    remarks: "",
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+
+  // Sorting and filtering state
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof VocabularyItem | "levelOrder";
+    direction: "asc" | "desc";
+  } | null>(null);
+  const [columnFilters, setColumnFilters] = useState<Partial<Record<keyof VocabularyItem, string>>>({});
 
   // AI Copilot suggestions state
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -144,6 +157,11 @@ export default function LessonPage() {
     translation: string;
     example: string;
     exampleZh: string;
+    article?: string;
+    gender?: string;
+    adjMasculine?: string;
+    adjFeminine?: string;
+    adjInclusive?: string;
   } | null>(null);
 
   const normalizeItem = (
@@ -156,6 +174,14 @@ export default function LessonPage() {
       ? (item.level as VocabularyLevel)
       : DEFAULT_LEVEL,
     exampleZh: item.exampleZh ?? "",
+    article: item.article ?? "",
+    gender: item.gender ?? "",
+    variants: item.variants ?? "",
+    phoneticDifficulty: item.phoneticDifficulty ?? "",
+    adjMasculine: item.adjMasculine ?? "",
+    adjFeminine: item.adjFeminine ?? "",
+    adjInclusive: item.adjInclusive ?? "",
+    remarks: item.remarks ?? "",
   });
 
   // Charger la leçon et les mots depuis le localStorage
@@ -215,17 +241,115 @@ export default function LessonPage() {
   }, [isPrintPreviewOpen]);
 
   const lessonItems = allItems.filter((item) => item.lessonId === lessonId);
-  const canReorder = !isAdding && !editingItem && searchQuery.trim().length === 0;
-  const filteredItems = lessonItems.filter((item) =>
-    [
-      item.word,
-      item.translation,
-      item.type,
-      item.level,
-      item.example,
-      item.exampleZh,
-    ].some((text) => text.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  const SortIndicator = ({ column }: { column: keyof VocabularyItem | "levelOrder" }) => {
+    if (sortConfig?.key !== column) return <span className="ml-1 text-zinc-400">↕</span>;
+    return <span className="ml-1 text-blue-600">{sortConfig.direction === "asc" ? "↑" : "↓"}</span>;
+  };
+
+  const ColumnHeader = ({ 
+    label, 
+    sortKey, 
+    filterKey, 
+    className = "" 
+  }: { 
+    label: string; 
+    sortKey?: keyof VocabularyItem | "levelOrder"; 
+    filterKey?: keyof VocabularyItem;
+    className?: string;
+  }) => (
+    <th className={`px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100 ${className}`}>
+      <div className="flex flex-col gap-1.5">
+        <button 
+          onClick={() => sortKey && handleSort(sortKey)}
+          className={`flex items-center hover:text-blue-600 transition-colors ${sortKey ? "cursor-pointer" : "cursor-default text-left"}`}
+          disabled={!sortKey}
+        >
+          {label}
+          {sortKey && <SortIndicator column={sortKey} />}
+        </button>
+        {filterKey && (
+          <input
+            type="text"
+            placeholder="Filtrer..."
+            value={columnFilters[filterKey] || ""}
+            onChange={(e) => handleFilterChange(filterKey, e.target.value)}
+            className="w-full px-2 py-1 text-[10px] font-normal border border-zinc-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+          />
+        )}
+      </div>
+    </th>
   );
+
+  const filteredItems = lessonItems
+    .filter((item) => {
+      // Global search filter
+      if (searchQuery.trim().length > 0) {
+        const query = searchQuery.toLowerCase();
+        const searchFields = [
+          item.word,
+          item.translation,
+          item.type,
+          item.level,
+          item.example,
+          item.exampleZh,
+          item.article || "",
+          item.gender || "",
+          item.variants || "",
+          item.phoneticDifficulty || "",
+          item.adjMasculine || "",
+          item.adjFeminine || "",
+          item.adjInclusive || "",
+          item.remarks || "",
+        ];
+        if (!searchFields.some((text) => text.toLowerCase().includes(query))) {
+          return false;
+        }
+      }
+
+      // Column filters
+      return (Object.keys(columnFilters) as Array<keyof VocabularyItem>).every((key) => {
+        const filterValue = columnFilters[key]?.toLowerCase();
+        if (!filterValue) return true;
+        const itemValue = String(item[key] || "").toLowerCase();
+        return itemValue.includes(filterValue);
+      });
+    })
+    .sort((a, b) => {
+      if (!sortConfig) return 0;
+
+      const { key, direction } = sortConfig;
+      let comparison = 0;
+
+      if (key === "levelOrder") {
+        comparison = getLevelSortOrder(a.level) - getLevelSortOrder(b.level);
+      } else {
+        const valA = String(a[key] || "").toLowerCase();
+        const valB = String(b[key] || "").toLowerCase();
+        comparison = valA.localeCompare(valB, "fr", { sensitivity: "base" });
+      }
+
+      return direction === "asc" ? comparison : -comparison;
+    });
+
+  const handleSort = (key: keyof VocabularyItem | "levelOrder") => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        if (prev.direction === "asc") {
+          return { key, direction: "desc" };
+        }
+        return null;
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const handleFilterChange = (key: keyof VocabularyItem, value: string) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [key]: value || undefined,
+    }));
+  };
   const selectedPrintItems = [...lessonItems]
     .filter((item) => selectedIds.has(item.id))
     .sort((a, b) => {
@@ -288,6 +412,14 @@ export default function LessonPage() {
       translation: "",
       example: "",
       exampleZh: "",
+      article: "",
+      gender: "",
+      variants: "",
+      phoneticDifficulty: "",
+      adjMasculine: "",
+      adjFeminine: "",
+      adjInclusive: "",
+      remarks: "",
     });
     setAiSuggestions(null);
     setSuggestionsError(null);
@@ -315,12 +447,20 @@ export default function LessonPage() {
     const newItem: VocabularyItem = {
       id: Math.random().toString(36).substr(2, 9),
       lessonId,
-      word: newWordValues.word,
-      type: newWordValues.type,
-      level: newWordValues.level as VocabularyLevel,
-      translation: newWordValues.translation,
-      example: newWordValues.example,
-      exampleZh: newWordValues.exampleZh,
+      word: newWordValues.word || "",
+      type: newWordValues.type || "",
+      level: (newWordValues.level as VocabularyLevel) || DEFAULT_LEVEL,
+      translation: newWordValues.translation || "",
+      example: newWordValues.example || "",
+      exampleZh: newWordValues.exampleZh || "",
+      article: newWordValues.article || "",
+      gender: newWordValues.gender || "",
+      variants: newWordValues.variants || "",
+      phoneticDifficulty: newWordValues.phoneticDifficulty || "",
+      adjMasculine: newWordValues.adjMasculine || "",
+      adjFeminine: newWordValues.adjFeminine || "",
+      adjInclusive: newWordValues.adjInclusive || "",
+      remarks: newWordValues.remarks || "",
     };
 
     setAllItems((prev) => [...prev, newItem]);
@@ -345,12 +485,20 @@ export default function LessonPage() {
     const newItem: VocabularyItem = {
       id: Math.random().toString(36).substr(2, 9),
       lessonId,
-      word: newWordValues.word,
-      type: newWordValues.type,
-      level: newWordValues.level as VocabularyLevel,
-      translation: newWordValues.translation,
-      example: newWordValues.example,
-      exampleZh: newWordValues.exampleZh,
+      word: newWordValues.word || "",
+      type: newWordValues.type || "",
+      level: (newWordValues.level as VocabularyLevel) || DEFAULT_LEVEL,
+      translation: newWordValues.translation || "",
+      example: newWordValues.example || "",
+      exampleZh: newWordValues.exampleZh || "",
+      article: newWordValues.article || "",
+      gender: newWordValues.gender || "",
+      variants: newWordValues.variants || "",
+      phoneticDifficulty: newWordValues.phoneticDifficulty || "",
+      adjMasculine: newWordValues.adjMasculine || "",
+      adjFeminine: newWordValues.adjFeminine || "",
+      adjInclusive: newWordValues.adjInclusive || "",
+      remarks: newWordValues.remarks || "",
     };
 
     setAllItems((prev) => [...prev, newItem]);
@@ -361,6 +509,14 @@ export default function LessonPage() {
       translation: "",
       example: "",
       exampleZh: "",
+      article: "",
+      gender: "",
+      variants: "",
+      phoneticDifficulty: "",
+      adjMasculine: "",
+      adjFeminine: "",
+      adjInclusive: "",
+      remarks: "",
     });
     setAiSuggestions(null);
     setSuggestionsError(null);
@@ -398,53 +554,6 @@ export default function LessonPage() {
     window.print();
   };
 
-  const reorderLessonItems = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
-
-    const currentLessonItems = allItems.filter((item) => item.lessonId === lessonId);
-    const sourceIndex = currentLessonItems.findIndex((item) => item.id === sourceId);
-    const targetIndex = currentLessonItems.findIndex((item) => item.id === targetId);
-    if (sourceIndex === -1 || targetIndex === -1) return;
-
-    const reorderedLessonItems = [...currentLessonItems];
-    const [movedItem] = reorderedLessonItems.splice(sourceIndex, 1);
-    reorderedLessonItems.splice(targetIndex, 0, movedItem);
-
-    // Remplace uniquement les items de cette leçon, en conservant l'ordre des autres leçons.
-    setAllItems((prev) => {
-      let lessonCursor = 0;
-      return prev.map((item) => {
-        if (item.lessonId !== lessonId) return item;
-        const next = reorderedLessonItems[lessonCursor];
-        lessonCursor += 1;
-        return next;
-      });
-    });
-  };
-
-  const handleDragStart = (id: string) => {
-    if (!canReorder) return;
-    setDraggingId(id);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, id: string) => {
-    if (!canReorder || !draggingId || draggingId === id) return;
-    e.preventDefault();
-    setDragOverId(id);
-  };
-
-  const handleDrop = (id: string) => {
-    if (!canReorder || !draggingId || draggingId === id) return;
-    reorderLessonItems(draggingId, id);
-    setDraggingId(null);
-    setDragOverId(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggingId(null);
-    setDragOverId(null);
-  };
-
   const fetchAiSuggestions = async () => {
     if (!newWordValues.word || newWordValues.word.trim().length === 0) {
       setSuggestionsError("Veuillez entrer un mot français d'abord");
@@ -462,7 +571,12 @@ export default function LessonPage() {
         !suggestions.type &&
         !suggestions.translation &&
         !suggestions.example &&
-        !suggestions.exampleZh
+        !suggestions.exampleZh &&
+        !suggestions.article &&
+        !suggestions.gender &&
+        !suggestions.adjMasculine &&
+        !suggestions.adjFeminine &&
+        !suggestions.adjInclusive
       ) {
         setSuggestionsError(
           "Impossible d'obtenir des suggestions. Vérifiez que GITHUB_TOKEN est configuré."
@@ -475,6 +589,11 @@ export default function LessonPage() {
           translation: suggestions.translation || prev.translation,
           example: suggestions.example || prev.example,
           exampleZh: suggestions.exampleZh || prev.exampleZh,
+          article: suggestions.article || prev.article,
+          gender: suggestions.gender || prev.gender,
+          adjMasculine: suggestions.adjMasculine || prev.adjMasculine,
+          adjFeminine: suggestions.adjFeminine || prev.adjFeminine,
+          adjInclusive: suggestions.adjInclusive || prev.adjInclusive,
         }));
       }
     } catch (error) {
@@ -533,9 +652,6 @@ export default function LessonPage() {
                 Vocabulaire
               </h1>
             )}
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Gérez votre liste de vocabulaire directement dans le tableau.
-            </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-3">
               {lessonItems.length} mot{lessonItems.length > 1 ? "s" : ""} dans cette leçon
             </p>
@@ -547,7 +663,7 @@ export default function LessonPage() {
             <div className="relative flex-1 w-full">
               <input
                 type="text"
-                placeholder="Filtrer le contenu..."
+                placeholder="Recherche globale (mot, traduction, exemple...)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
@@ -610,12 +726,6 @@ export default function LessonPage() {
               </button>
             )}
           </div>
-
-          {!canReorder && searchQuery.trim().length > 0 && (
-            <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400 print:hidden">
-              Le drag & drop est désactivé pendant le filtrage.
-            </p>
-          )}
 
           {isAdding && (
             <div className="mb-6 bg-white rounded-2xl shadow-sm border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 p-4 sm:p-6 print:hidden">
@@ -682,11 +792,27 @@ export default function LessonPage() {
                   autoFocus
                 />
                 <input
+                  type="text"
+                  value={newWordValues.article}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, article: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Article (le, un...)"
+                />
+                <select
+                  value={newWordValues.gender}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, gender: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                >
+                  <option value="">Genre</option>
+                  <option value="masculin">Masculin</option>
+                  <option value="féminin">Féminin</option>
+                </select>
+                <input
                   list="types-fr"
                   value={newWordValues.type}
                   onChange={(e) => setNewWordValues({ ...newWordValues, type: e.target.value })}
                   className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
-                  placeholder="Type (pronom, expression, verbe, article...)"
+                  placeholder="Type (verbe, adjectif...)"
                 />
                 <select
                   value={newWordValues.level}
@@ -706,7 +832,49 @@ export default function LessonPage() {
                   value={newWordValues.translation}
                   onChange={(e) => setNewWordValues({ ...newWordValues, translation: e.target.value })}
                   className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
-                  placeholder="Traduction (chinois traditionnel)"
+                  placeholder="Traduction"
+                />
+                <input
+                  type="text"
+                  value={newWordValues.variants}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, variants: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Variantes"
+                />
+                <input
+                  type="text"
+                  value={newWordValues.phoneticDifficulty}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, phoneticDifficulty: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Diff. phonétique"
+                />
+                <input
+                  type="text"
+                  value={newWordValues.adjMasculine}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, adjMasculine: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Adj. Masculin"
+                />
+                <input
+                  type="text"
+                  value={newWordValues.adjFeminine}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, adjFeminine: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Adj. Féminin"
+                />
+                <input
+                  type="text"
+                  value={newWordValues.adjInclusive}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, adjInclusive: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Adj. Inclusif"
+                />
+                <input
+                  type="text"
+                  value={newWordValues.remarks}
+                  onChange={(e) => setNewWordValues({ ...newWordValues, remarks: e.target.value })}
+                  className="px-3 py-2 text-sm border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                  placeholder="Remarques"
                 />
                 <textarea
                   value={newWordValues.example}
@@ -740,21 +908,31 @@ export default function LessonPage() {
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200 dark:bg-zinc-800/50 dark:border-zinc-800 sticky top-0 z-10">
                     <th className="px-4 py-3 w-10">
-                      <input
-                        type="checkbox"
-                        checked={filteredItems.length > 0 && selectedIds.size === filteredItems.length}
-                        onChange={toggleSelectAll}
-                        className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
-                      />
+                      <div className="flex flex-col gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={filteredItems.length > 0 && selectedIds.size === filteredItems.length}
+                          onChange={toggleSelectAll}
+                          className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div className="h-6"></div>
+                      </div>
                     </th>
-                    <th className="px-2 py-3 w-8"></th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Mot</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Type</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Niveau</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Traduction</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100 hidden lg:table-cell">Exemple fr</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100 hidden lg:table-cell">Exemple zh</th>
-                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>
+                    <ColumnHeader label="Mot" sortKey="word" filterKey="word" />
+                    <ColumnHeader label="Art." sortKey="article" filterKey="article" />
+                    <ColumnHeader label="Genre" sortKey="gender" filterKey="gender" />
+                    <ColumnHeader label="Type" sortKey="type" filterKey="type" />
+                    <ColumnHeader label="Niveau" sortKey="levelOrder" filterKey="level" />
+                    <ColumnHeader label="Traduction" sortKey="translation" filterKey="translation" />
+                    <ColumnHeader label="Adj (M/F/I)" className="hidden lg:table-cell" />
+                    <ColumnHeader label="Exemple fr" sortKey="example" filterKey="example" className="hidden lg:table-cell" />
+                    <ColumnHeader label="Exemple zh" sortKey="exampleZh" filterKey="exampleZh" className="hidden lg:table-cell" />
+                    <th className="px-4 py-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">
+                      <div className="flex flex-col gap-1.5">
+                        <span>Actions</span>
+                        <div className="h-6"></div>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -766,18 +944,13 @@ export default function LessonPage() {
                       return (
                         <tr
                           key={item.id}
-                          draggable={canReorder && !isEditing}
-                          onDragStart={() => handleDragStart(item.id)}
-                          onDragOver={(e) => handleDragOver(e, item.id)}
-                          onDrop={() => handleDrop(item.id)}
-                          onDragEnd={handleDragEnd}
                           className={`${
                             isEditing
                               ? "bg-blue-50/30 dark:bg-blue-900/10"
                               : isSelected
                               ? "bg-blue-50/20 dark:bg-blue-900/5"
                               : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
-                          } ${dragOverId === item.id ? "ring-2 ring-blue-400" : ""} transition-colors group`}
+                          } transition-colors group`}
                         >
                           <td className="px-4 py-4">
                             <input
@@ -786,13 +959,6 @@ export default function LessonPage() {
                               onChange={() => toggleSelection(item.id)}
                               className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
                             />
-                          </td>
-                          <td className="px-2 py-4 text-zinc-400">
-                            {!isEditing && canReorder ? (
-                              <span title="Glisser pour réordonner" className="cursor-grab select-none active:cursor-grabbing">
-                                ⋮⋮
-                              </span>
-                            ) : null}
                           </td>
 
                           {isEditing ? (
@@ -807,6 +973,29 @@ export default function LessonPage() {
                                   className="w-full px-2 py-1 text-sm border border-zinc-300 rounded dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
                                   autoFocus
                                 />
+                              </td>
+                              <td className="px-4 py-4">
+                                <input
+                                  type="text"
+                                  value={editValues.article}
+                                  onChange={(e) =>
+                                    setEditValues({ ...editValues, article: e.target.value })
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-zinc-300 rounded dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                                />
+                              </td>
+                              <td className="px-4 py-4">
+                                <select
+                                  value={editValues.gender}
+                                  onChange={(e) =>
+                                    setEditValues({ ...editValues, gender: e.target.value })
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-zinc-300 rounded dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                                >
+                                  <option value="">Genre</option>
+                                  <option value="masculin">masculin</option>
+                                  <option value="féminin">féminin</option>
+                                </select>
                               </td>
                               <td className="px-4 py-4">
                                 <input
@@ -837,14 +1026,66 @@ export default function LessonPage() {
                                 </select>
                               </td>
                               <td className="px-4 py-4">
-                                <input
-                                  type="text"
-                                  value={editValues.translation}
-                                  onChange={(e) =>
-                                    setEditValues({ ...editValues, translation: e.target.value })
-                                  }
-                                  className="w-full px-2 py-1 text-sm border border-zinc-300 rounded dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
-                                />
+                                <div className="flex flex-col gap-1">
+                                  <input
+                                    type="text"
+                                    value={editValues.translation}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, translation: e.target.value })
+                                    }
+                                    className="w-full px-2 py-1 text-sm border border-zinc-300 rounded dark:bg-zinc-950 dark:border-zinc-700 dark:text-zinc-100"
+                                    placeholder="Traduction"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editValues.variants}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, variants: e.target.value })
+                                    }
+                                    className="w-full px-2 py-1 text-xs border border-zinc-200 rounded dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300"
+                                    placeholder="Variantes"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editValues.remarks}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, remarks: e.target.value })
+                                    }
+                                    className="w-full px-2 py-1 text-xs border border-zinc-200 rounded dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300"
+                                    placeholder="Remarques"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 hidden lg:table-cell">
+                                <div className="flex flex-col gap-1">
+                                  <input
+                                    type="text"
+                                    value={editValues.adjMasculine}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, adjMasculine: e.target.value })
+                                    }
+                                    className="w-full px-1 py-0.5 text-[10px] border border-zinc-200 rounded dark:bg-zinc-900 dark:border-zinc-800"
+                                    placeholder="Masculin"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editValues.adjFeminine}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, adjFeminine: e.target.value })
+                                    }
+                                    className="w-full px-1 py-0.5 text-[10px] border border-zinc-200 rounded dark:bg-zinc-900 dark:border-zinc-800"
+                                    placeholder="Féminin"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editValues.adjInclusive}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, adjInclusive: e.target.value })
+                                    }
+                                    className="w-full px-1 py-0.5 text-[10px] border border-zinc-200 rounded dark:bg-zinc-900 dark:border-zinc-800"
+                                    placeholder="Inclusif"
+                                  />
+                                </div>
                               </td>
                               <td className="px-4 py-4 hidden lg:table-cell">
                                 <textarea
@@ -915,6 +1156,17 @@ export default function LessonPage() {
                             <>
                               <td className="px-4 py-4 text-sm font-bold text-zinc-900 dark:text-zinc-100">
                                 {item.word}
+                                {item.phoneticDifficulty && (
+                                  <div className="text-[10px] font-normal text-red-500 mt-0.5">
+                                    [ {item.phoneticDifficulty} ]
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
+                                {item.article}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300 italic">
+                                {item.gender}
                               </td>
                               <td className="px-4 py-4 text-sm text-zinc-700 dark:text-zinc-300">
                                 {item.type}
@@ -929,7 +1181,16 @@ export default function LessonPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-4 text-sm text-blue-600 dark:text-blue-400 font-medium">
-                                {item.translation}
+                                <div>{item.translation}</div>
+                                {item.variants && <div className="text-[10px] text-zinc-400 font-normal">{item.variants}</div>}
+                                {item.remarks && <div className="text-[10px] text-zinc-500 font-normal italic mt-1">{item.remarks}</div>}
+                              </td>
+                              <td className="px-4 py-4 text-xs text-zinc-600 dark:text-zinc-400 hidden lg:table-cell">
+                                <div className="flex flex-col">
+                                  {item.adjMasculine && <span>M: {item.adjMasculine}</span>}
+                                  {item.adjFeminine && <span>F: {item.adjFeminine}</span>}
+                                  {item.adjInclusive && <span>I: {item.adjInclusive}</span>}
+                                </div>
                               </td>
                               <td className="px-4 py-4 text-sm text-zinc-600 dark:text-zinc-400 italic hidden lg:table-cell">
                                 {item.example}
